@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>RealTimeChatAPI SignalR Test Client</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 900px; margin: 2rem auto; padding: 0 1rem; }
+    label { display: block; margin-top: 1rem; font-weight: 600; }
+    input, textarea, button { box-sizing: border-box; width: 100%; padding: .65rem; margin-top: .35rem; }
+    button { cursor: pointer; }
+    pre { min-height: 240px; padding: 1rem; overflow: auto; background: #111; color: #eee; white-space: pre-wrap; }
+    .row { display: grid; grid-template-columns: 1fr 1fr; gap: .75rem; }
+  </style>
+</head>
+<body>
+  <h1>SignalR Test Client</h1>
+  <p>This development-only page uses the SignalR JSON wire protocol directly. It stores nothing and sends the entered JWT only to the configured API.</p>
+
+  <label for="apiUrl">API URL</label>
+  <input id="apiUrl" value="http://localhost:5000">
+
+  <label for="token">JWT access token</label>
+  <textarea id="token" rows="4" autocomplete="off"></textarea>
+
+  <div class="row">
+    <button id="connect">Connect</button>
+    <button id="disconnect">Disconnect</button>
+  </div>
+
+  <label for="recipientId">Recipient user ID</label>
+  <input id="recipientId" placeholder="00000000-0000-0000-0000-000000000000">
+
+  <label for="message">Message</label>
+  <input id="message" maxlength="4000" placeholder="Hello">
+  <button id="send">Send message</button>
+
+  <h2>Events</h2>
+  <pre id="log"></pre>
+
+  <script>
+    const recordSeparator = String.fromCharCode(0x1e);
+    const logElement = document.getElementById('log');
+    let socket;
+
+    function log(value) {
+      const line = typeof value === 'string' ? value : JSON.stringify(value, null, 2);
+      logElement.textContent += `${new Date().toISOString()} ${line}\n`;
+      logElement.scrollTop = logElement.scrollHeight;
+    }
+
+    function sendFrame(payload) {
+      if (!socket || socket.readyState !== WebSocket.OPEN) {
+        log('Socket is not connected.');
+        return;
+      }
+      socket.send(JSON.stringify(payload) + recordSeparator);
+    }
+
+    document.getElementById('connect').addEventListener('click', async () => {
+      const apiUrl = document.getElementById('apiUrl').value.replace(/\/$/, '');
+      const token = document.getElementById('token').value.trim();
+      if (!token) {
+        log('Enter a JWT first.');
+        return;
+      }
+
+      try {
+        const negotiateResponse = await fetch(`${apiUrl}/ChatHub/negotiate?negotiateVersion=1`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (!negotiateResponse.ok) {
+          log(`Negotiate failed: HTTP ${negotiateResponse.status}`);
+          return;
+        }
+
+        const negotiation = await negotiateResponse.json();
+        const socketUrl = new URL('/ChatHub', apiUrl);
+        socketUrl.protocol = socketUrl.protocol === 'https:' ? 'wss:' : 'ws:';
+        socketUrl.searchParams.set('id', negotiation.connectionToken);
+        socketUrl.searchParams.set('access_token', token);
+
+        socket = new WebSocket(socketUrl);
+        socket.addEventListener('open', () => {
+          socket.send(JSON.stringify({ protocol: 'json', version: 1 }) + recordSeparator);
+          log('Connected; SignalR handshake sent.');
+        });
+        socket.addEventListener('message', event => {
+          for (const frame of event.data.split(recordSeparator).filter(Boolean)) {
+            const payload = JSON.parse(frame);
+            if (payload.type === 1) {
+              log({ event: payload.target, arguments: payload.arguments });
+            } else {
+              log(payload);
+            }
+          }
+        });
+        socket.addEventListener('close', event => log(`Disconnected (${event.code}).`));
+        socket.addEventListener('error', () => log('WebSocket error.'));
+      } catch (error) {
+        log(error instanceof Error ? error.message : String(error));
+      }
+    });
+
+    document.getElementById('disconnect').addEventListener('click', () => socket?.close());
+    document.getElementById('send').addEventListener('click', () => {
+      sendFrame({
+        type: 1,
+        target: 'SendMessage',
+        arguments: [
+          document.getElementById('recipientId').value.trim(),
+          document.getElementById('message').value
+        ]
+      });
+    });
+  </script>
+</body>
+</html>

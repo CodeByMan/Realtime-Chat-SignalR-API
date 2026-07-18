@@ -1,0 +1,149 @@
+{
+  "info": {
+    "_postman_id": "5adcfcbf-3e11-4dd8-9728-32c40f53a17e",
+    "name": "RealTimeChatAPI",
+    "description": "HTTP requests for the ASP.NET Core Real-Time Private Chat API. Run Register and Login first. Login stores the JWT in the collection variable named token.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:5000" },
+    { "key": "token", "value": "" },
+    { "key": "otherUserId", "value": "00000000-0000-0000-0000-000000000000" }
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      { "key": "token", "value": "{{token}}", "type": "string" }
+    ]
+  },
+  "item": [
+    {
+      "name": "Users",
+      "item": [
+        {
+          "name": "Register",
+          "auth": { "type": "noauth" },
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Alice Example\",\n  \"username\": \"alice1\",\n  \"password\": \"ChangeMe123!\"\n}"
+            },
+            "url": "{{baseUrl}}/api/users/register"
+          }
+        },
+        {
+          "name": "Login",
+          "auth": { "type": "noauth" },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "  pm.collectionVariables.set('token', pm.response.json().token);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"alice1\",\n  \"password\": \"ChangeMe123!\"\n}"
+            },
+            "url": "{{baseUrl}}/api/users/login"
+          }
+        },
+        {
+          "name": "Get Current User",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/users/me"
+          }
+        },
+        {
+          "name": "Get User By ID",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/users/{{otherUserId}}"
+          }
+        },
+        {
+          "name": "Update Profile",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Alice Updated\",\n  \"about\": \"Testing RealTimeChatAPI\"\n}"
+            },
+            "url": "{{baseUrl}}/api/users/me"
+          }
+        },
+        {
+          "name": "Upload Profile Image",
+          "request": {
+            "method": "PATCH",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "Image", "type": "file", "src": "" }
+              ]
+            },
+            "url": "{{baseUrl}}/api/users/me/image"
+          }
+        },
+        {
+          "name": "Delete Profile Image",
+          "request": {
+            "method": "DELETE",
+            "url": "{{baseUrl}}/api/users/me/image"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Messages and Chats",
+      "item": [
+        {
+          "name": "Get Message History",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/messages/{{otherUserId}}"
+          }
+        },
+        {
+          "name": "Get My Chats",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/chats"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Hub Metadata",
+      "item": [
+        {
+          "name": "Get ChatHub Info",
+          "auth": { "type": "noauth" },
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/hubs/ChatHub/info"
+          }
+        }
+      ]
+    }
+  ]
+}
